@@ -1,58 +1,97 @@
-# OmniDeck: Modular Asymmetric IoT Puzzle Console
+# OmniDeck: An Asymmetric IoT Puzzle Platform
 
-**OmniDeck** is an open-source, modular IoT hardware platform designed for interactive, asymmetric cooperative puzzles. It functions as a **"Dumb Terminal"** that bridges physical sensory data with cloud-based game logic, allowing a local **Operative** and a remote **Hacker** to collaborate in real-time.
+## Project Summary
+OmniDeck is an innovative, asymmetric cooperative IoT hardware platform designed to merge physical puzzles with digital cloud-based mechanics—creating a "Keep Talking and Nobody Explodes" style escape room experience. Acting as a "Dumb Terminal," the physical device utilizes an ESP32 to read environmental and interactive telemetry (spatial orientation, rotational vault-cracking inputs, proximity, temperature, and light intensity) and publishes this data to the Arduino IoT Cloud in real-time via WebSockets. A remote "Hacker" monitors these live feeds on a web dashboard and transmits haptic (vibration) clues and game-stage commands back to the console. The cloud platform functions as the ultimate Game Master, orchestrating a complete Sense-Think-Act cycle where the physical hardware is fully decoupled from the game logic, eventually releasing a mechanical servo-latch upon successful cooperation.
 
----
+## Components List
+Our project exceeds the minimum requirements (2 sensors + OLED + 1 actuator) by utilizing a comprehensive ecosystem of components:
+*   **Microcontroller:** ESP32 Development Board (ESP-WROOM-32)
+*   **Display:** 0.96" I2C OLED Display (128x64)
+*   **Sensor 1:** MPU6050 (Accelerometer/Gyroscope)
+*   **Sensor 2:** KY-040 (Rotary Encoder with Push Button)
+*   **Sensor 3:** HC-SR04 (Ultrasonic Distance Sensor)
+*   **Sensor 4:** DHT11 (Temperature & Humidity Sensor)
+*   **Sensor 5:** 4-Pin LDR (Light Dependent Resistor Module)
+*   **Actuator 1:** SG90 Micro Servo Motor
+*   **Actuator 2:** Vibration Motor Module
 
-## Core Concept: The Asymmetric Heist
-The project is built on a high-stakes **Hacker vs. Operative** dynamic:
+## Wiring Table & Diagram
 
-* **The Operative:** Holds the physical console. They must navigate menus and manipulate hardware (tilting, dialing, covering sensors) to bypass physical security layers.
-* **The Hacker:** Monitors a live **Adafruit IO** dashboard from anywhere in the world. They interpret telemetry to guide the Operative and send remote commands to trigger physical actuators.
+| Component | Component Pin | ESP32 GPIO Pin | Notes |
+| :--- | :--- | :--- | :--- |
+| **OLED Display** | SDA / SCL | GPIO 21 / GPIO 22 | I2C Bus (3.3V) |
+| **MPU6050** | SDA / SCL | GPIO 21 / GPIO 22 | I2C Bus (3.3V) |
+| **KY-040 Encoder** | CLK / DT / SW | GPIO 32 / 33 / 25 | Hardware Interrupt (3.3V) |
+| **HC-SR04** | TRIG / ECHO | GPIO 5 / GPIO 18 | 5V VIN Powered |
+| **DHT11** | DATA (S) | GPIO 4 | 3.3V Powered |
+| **LDR Module** | A0 (Analog) | GPIO 34 | Analog Input (3.3V) |
+| **SG90 Servo** | SIGNAL (Orange) | GPIO 26 | 5V VIN Powered |
+| **Vibration Motor**| IN (Signal) | GPIO 27 | 3.3V Powered |
 
----
+### Wiring Diagram
 
-## Hardware Architecture
-OmniDeck utilizes an **ESP32** to aggregate data from 5 sensors and drive 2 actuators.
-
-### Sensors (Inputs)
-| Component | Function |
-| :--- | :--- |
-| **MPU6050** | 6-Axis Motion & Tilt sensing for spatial/balance puzzles. |
-| **KY-040 Encoder** | High-precision rotary dial for digital safe-cracking. |
-| **HC-SR04** | Ultrasonic distance mapping for proximity/stealth triggers. |
-| **DHT11** | Environmental monitoring (e.g., "overheating" the system). |
-| **LDR Module** | Ambient light detection for "blackout" or flashlight modes. |
-
-### Actuators & UI (Outputs)
-| Component | Function |
-| :--- | :--- |
-| **SSD1306 OLED** | 128x64 HUD for real-time status and dynamic graphics. |
-| **SG90 Servo** | Mechanical latch for unlocking a physical "prize" compartment. |
-| **Vibration Motor** | Haptic feedback engine for Morse code clues and warnings. |
-
-
-
----
-
-## System Design
-OmniDeck follows a **Hub-and-Spoke architecture** using the **MQTT protocol**.
-
-1.  **Hardware Proxy:** The ESP32 collects raw sensor data and publishes it as **JSON payloads**.
-2.  **Cloud Hub:** **Adafruit IO** acts as the central broker, decoupling the physical hardware from the game logic.
-3.  **Logic Engine:** The Web Dashboard processes incoming telemetry and publishes command signals (e.g., `servo_unlock: 1`) back to the hardware.
+<p align="center">
+  <img src="OmniDeckWiring.png" width="700" alt="OmniDeck Wiring Diagram">
+  <br>
+  <i>Figure 1: Complete wiring diagram showing ESP32, sensors, and actuators. 5V and 3.3V logic levels are separated via breadboard power rails.</i>
+</p>
 
 
+## Cloud Setup (Arduino IoT Cloud)
 
----
+*   **Cloud Platform:** Arduino IoT Cloud
+*   **Network:** Wi-Fi connected via ESP32.
+*   **Cloud Variables (Feeds):**
+    *   `dist` (Integer, Read Only, On Change)
+    *   `temp` (Floating Point, Read Only, On Change)
+    *   `light` (Integer, Read Only, On Change)
+    *   `tilt` (Character String, Read Only, On Change)
+    *   `dial` (Integer, Read Only, On Change)
+    *   `game_log` (Character String, Read Only, On Change)
+    *   `hacker_cmd` (Character String, Read & Write, On Change) - *Triggers callback function.*
+*   **Dashboard Widgets:**
+    *   **Monitoring:** Gauges for Distance & Light, Value widgets for Temp, Tilt, Dial, and a wide Value widget for the `game_log`.
+    *   **Control:** String Input / Messenger widget linked to `hacker_cmd` for sending remote terminal commands (e.g., STAGE1, STAGE2, VIB, OPEN).
 
-## Example Puzzle Mechanics
-* **The Vault:** The Hacker sees a 4-digit code on their screen. The Operative must use the **KY-040 Encoder** to input the numbers, receiving a haptic "click" via the **Vibration Motor** when correct.
-* **The Laser Grid:** The Operative must keep the device perfectly level using the **MPU6050**. If the tilt exceeds 15°, the Hacker’s dashboard alerts "Detected!" and the Operative must restart.
-* **The Blackout:** The Hacker triggers a "Blackout" mode. The Operative must find a real-world light source (using the **LDR**) to restore the OLED display.
+## How to Run
 
----
+1.  **Libraries Required:** Install the following via Arduino IDE Library Manager:
+    *   `Adafruit GFX Library`
+    *   `Adafruit SSD1306`
+    *   `Adafruit MPU6050` & `Adafruit Unified Sensor`
+    *   `DHT sensor library`
+    *   `ESP32Servo`
+    *   `ArduinoIoTCloud` & `Arduino_ConnectionHandler`
+2.  **Board Settings:** Select **DOIT ESP32 DEVKIT V1** in the Arduino IDE.
+3.  **Network Configuration:** In the Arduino Cloud Web Editor, navigate to the `Secret` tab or `arduino_secrets.h` and input your `SECRET_SSID` (Wi-Fi Name) and `SECRET_PASS` (Wi-Fi Password).
+4.  **Upload:** Connect the ESP32 via USB and upload the sketch.
 
+## How it Works (Logic & Data Flow)
 
-## 🧑‍💻 Author
-**BatY0** *Department of Computer Engineering* [GitHub Profile](https://github.com/BatY0)
+The system operates on a rapid **Sense-Think-Act** loop synchronized with the cloud via WebSockets:
+1.  **Data Upload (Sense & Think):** Every 100ms, the ESP32 reads local hardware (converting MPU vectors to directional strings like "RIGHT", interpreting the LDR light intensity, etc.). The Rotary Encoder uses a hardware interrupt (`IRAM_ATTR`) to guarantee zero-latency turning. Variables are automatically pushed to the Arduino Cloud upon any change.
+2.  **Dashboard Control Logic (Act):** The Hacker observes the live sensor data on the dashboard and issues game-progression commands via the `hacker_cmd` terminal. 
+    *   When the Hacker sends a command (e.g., `"STAGE1"` or `"VIBLONG"`), the cloud pushes this value to the ESP32.
+    *   The `onHackerCmdChange()` callback function is triggered locally on the ESP32, which then alters the game state, updates the OLED prompt zone, or actuates the hardware (moving the SG90 servo to lock/unlock, or pulsing the vibration motor for Haptic Morse Code).
+3.  **Local UI:** The OLED is hardcoded to represent 3 functional zones: The Status Bar (Network/Cloud state), the Interaction Zone (Sensor readouts and a dynamic inclinometer ball), and the Prompt Zone (Real-time remote commands).
+
+## Evidence
+
+### Dashboard Screenshots
+
+<p align="center">
+  <img src="OmniDeckSensorTelemetry.png" width="700" alt="Sensor Telemetry Dashboard">
+  <br>
+  <i>Figure 2: "Academic Overview" dashboard displaying real-time telemetry from all 5 sensors to meet project requirements.</i>
+</p>
+
+<p align="center">
+  <img src="BlindHeistTerminal.png" width="700" alt="Hacker Terminal Dashboard">
+  <br>
+  <i>Figure 3: "The Blind Heist" Mission Control terminal. Used by the Hacker to send remote commands (STAGE1, OPEN, VIB) and monitor live game logs.</i>
+</p>
+
+### Demonstration
+Watch the full functionality and game demo here:
+**[▶️ Click here to watch the OmniDeck Demo Video on YouTube/Drive] (#)** 
+*(Note: Link will be updated before the presentation).*
